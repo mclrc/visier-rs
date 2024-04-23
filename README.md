@@ -6,7 +6,7 @@ Allows easy, type-safe access to [VizieR](https://vizier.cds.unistra.fr/) TAP AP
 
 ### Basic, untyped usage:
 ```rust
-use vizier::Client;
+use vizier_adql::Client;
 use serde_json::Value;
 
 // 1. Create a client
