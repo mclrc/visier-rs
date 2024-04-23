@@ -1,8 +1,12 @@
 # vizier-rs
-[![Tests](https://github.com/mclrc/vizier-rs/actions/workflows/tests.yml/badge.svg)](https://github.com/mclrc/vizier-rs/actions/workflows/tests.yml)
+[![Tests](https://github.com/mclrc/vizier-rs/actions/workflows/tests.yml/badge.svg)](https://github.com/mclrc/vizier-rs/actions/workflows/tests.yml) [![Crates.io](https://img.shields.io/crates/v/vizier-adql.svg)](https://crates.io/crates/vizier-adql)
+
 ## A basic VizieR client for rust
 
 Allows easy, type-safe access to [VizieR](https://vizier.cds.unistra.fr/) TAP APIs to query a wide variety of astronomical catalogues using [ADQL](https://tapvizier.u-strasbg.fr/adql/help.html).
+
+### Installation
+Run `$ cargo add vizier-adql`, or add `vizier-adql = "0.1.1"` to `Cargo.toml` under `[dependencies]`.
 
 ### Basic, untyped usage:
 ```rust
