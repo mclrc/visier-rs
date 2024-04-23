@@ -1,9 +1,9 @@
 [package]
-name = "vizier"
+name = "vizier-adql"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-2.0"
-description = "Simple Rust client for querying astronomical data from VizieR"
+description = "Simple Rust client for querying astronomical data from VizieR using ADQL"
 repository = "https://github.com/mclrc/vizier-rs"
 
 [dependencies]

@@ -734,7 +734,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "vizier"
+name = "vizier-adql"
 version = "0.1.0"
 dependencies = [
  "reqwest",
