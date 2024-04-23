@@ -94,11 +94,12 @@ mod tests {
 
     #[tokio::test]
     async fn query_test() {
-        let adql_query = "SELECT TOP 100 * FROM \"I/261/fonac\"";
-
         let client = Client::default();
 
-        let result = client.query::<Value>(adql_query).await.unwrap();
+        let result = client
+            .query::<Value>("SELECT TOP 100 * FROM \"I/261/fonac\"")
+            .await
+            .unwrap();
 
         assert!(result.len() == 100);
     }
@@ -128,8 +129,9 @@ mod tests {
     async fn query_test_typed() {
         let client = Client::default();
 
-        let adql_query = "SELECT TOP 100 * FROM \"I/261/fonac\"";
-
-        client.query::<QueryResult>(adql_query).await.unwrap();
+        client
+            .query::<QueryResult>("SELECT TOP 100 * FROM \"I/261/fonac\"")
+            .await
+            .unwrap();
     }
 }
