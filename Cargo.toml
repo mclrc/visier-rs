@@ -2,7 +2,7 @@
 name = "vizier"
 version = "0.1.0"
 edition = "2021"
-license = "gpl-3.0"
+license = "GPL-2.0"
 description = "Simple Rust client for querying astronomical data from VizieR"
 repository = "https://github.com/mclrc/vizier-rs"
 
