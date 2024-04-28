@@ -8,7 +8,7 @@ Allows easy, type-safe access to [VizieR](https://vizier.cds.unistra.fr/) TAP AP
 ### Installation
 Run `$ cargo add vizier-adql`, or add `vizier-adql = "0.1.1"` to `Cargo.toml` under `[dependencies]`.
 
-### Basic, untyped usage:
+### Basic, untyped usage
 ```rust
 use vizier_adql::Client;
 use serde_json::Value;
@@ -26,7 +26,10 @@ let objects = client
 ```
 `Client::default()` will use `http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync` as the TAP endpoint. If you need to specify a different endpoint, use `Client::new("your_endpoint_url")`.
 
-### Typed usage:
+### Sync/Async
+If you don't want to use async, enable the `is_sync` feature on the crate. The API won't change, except that `Client::query` now blocks and returns the value directly.
+
+### Typed usage
 To strictly parse the response, create a struct resembling an element from the response and derive `Deserialize` for it.
 
 ```rust
