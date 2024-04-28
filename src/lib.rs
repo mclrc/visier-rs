@@ -1,13 +1,15 @@
 use maybe_async::maybe_async;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{json, Map, Value};
-use std::error::Error;
+use thiserror::Error;
 
 #[cfg(not(feature = "is_sync"))]
 use reqwest::Client as HttpClient;
 
 #[cfg(feature = "is_sync")]
 use reqwest::blocking::Client as HttpClient;
+
+const DEFAULT_VIZIER_TAP_URL: &str = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync";
 
 #[cfg(not(feature = "is_sync"))]
 macro_rules! maybe_await {
@@ -23,7 +25,58 @@ macro_rules! maybe_await {
     };
 }
 
-const DEFAULT_VIZIER_TAP_URL: &str = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync";
+#[derive(Error, Debug)]
+pub enum VizierError {
+    #[error("Request failed: {0}")]
+    RequestFailed(reqwest::Error),
+    #[error("Non-success status code: {0}")]
+    NonSuccessStatus(reqwest::StatusCode),
+    #[error("Unexpected response schema: {0}")]
+    UnexpectedSchema(String),
+    #[error("Failed to deserialize response: {0}")]
+    DeserializationFailed(serde_json::Error),
+    #[error("{0}")]
+    Other(String),
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ColumnMetadata {
+    pub name: String,
+    pub description: String,
+    pub arraysize: Option<String>,
+    pub unit: Option<String>,
+    pub ucd: String,
+}
+
+#[derive(Deserialize)]
+struct ResponseSchema {
+    #[serde(rename = "metadata")]
+    meta: Vec<ColumnMetadata>,
+    data: Vec<Vec<Value>>,
+}
+
+pub struct QueryResult<T> {
+    meta: Vec<ColumnMetadata>,
+    data: Vec<T>,
+}
+
+impl<T> QueryResult<T> {
+    pub fn meta(&self) -> &[ColumnMetadata] {
+        &self.meta
+    }
+
+    pub fn data(&self) -> &[T] {
+        &self.data
+    }
+
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+}
 
 pub struct Client {
     tap_url: String,
@@ -42,7 +95,7 @@ impl Client {
     pub async fn query<T: DeserializeOwned>(
         &self,
         adql_query: &str,
-    ) -> Result<Vec<T>, Box<dyn Error>> {
+    ) -> Result<QueryResult<T>, VizierError> {
         let request_query = json!({
             "request": "doQuery",
             "lang": "ADQL",
@@ -54,50 +107,40 @@ impl Client {
             .http_client
             .get(&self.tap_url)
             .query(&request_query)
-            .send())?;
+            .send())
+        .map_err(VizierError::RequestFailed)?;
 
         if response.status().is_success() {
-            let data = maybe_await!(response.json::<Value>())?;
-            let parsed_data = Client::parse_query_result::<T>(data)?;
+            let data =
+                maybe_await!(response.json::<Value>()).map_err(VizierError::RequestFailed)?;
+            let parsed_data = Client::parse_query_result::<T>(data)
+                .map_err(VizierError::DeserializationFailed)?;
+
             Ok(parsed_data)
         } else {
-            Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to fetch data",
-            )))
+            Err(VizierError::NonSuccessStatus(response.status()))
         }
     }
 
-    fn parse_query_result<T: DeserializeOwned>(data: Value) -> Result<Vec<T>, Box<dyn Error>> {
-        let columns = data
-            .get("metadata")
-            .ok_or("Metadata not found")?
-            .as_array()
-            .ok_or("Metadata is not an array")?;
-        let data = data.get("data").ok_or("Data not found")?;
-
-        let mut column_names = Vec::new();
-        for column in columns {
-            let name = column.get("name").ok_or("Column name not found")?;
-            column_names.push(name.as_str().ok_or("Column name is not a string")?);
-        }
+    fn parse_query_result<T: DeserializeOwned>(
+        data: Value,
+    ) -> Result<QueryResult<T>, serde_json::Error> {
+        let response = serde_json::from_value::<ResponseSchema>(data)?;
 
         let mut result = Vec::new();
-        for row in data.as_array().ok_or("Data is not an array")? {
+        for row in response.data {
             let mut row_data = Map::new();
 
-            for (i, value) in row
-                .as_array()
-                .ok_or("Row is not an array")?
-                .iter()
-                .enumerate()
-            {
-                row_data.insert(column_names[i].to_string(), value.clone());
+            for (i, value) in row.iter().enumerate() {
+                row_data.insert(response.meta[i].name.clone(), value.clone());
             }
             result.push(serde_json::from_value(Value::Object(row_data))?);
         }
 
-        Ok(result)
+        Ok(QueryResult {
+            meta: response.meta,
+            data: result,
+        })
     }
 }
 
@@ -128,7 +171,7 @@ mod tests {
 
     #[derive(Deserialize, Debug)]
     #[allow(non_snake_case, dead_code)]
-    struct QueryResult {
+    struct Object {
         AC2000: i32,
         ACT: Option<i32>,
         #[serde(rename = "B-R")]
@@ -153,7 +196,7 @@ mod tests {
         let client = Client::default();
 
         client
-            .query::<QueryResult>("SELECT TOP 100 * FROM \"I/261/fonac\"")
+            .query::<Object>("SELECT TOP 100 * FROM \"I/261/fonac\"")
             .await
             .unwrap();
     }
