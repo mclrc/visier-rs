@@ -18,5 +18,7 @@ jobs:
       run: cargo build --release --verbose
     - name: Lint
       run: cargo clippy -- -Dwarnings
-    - name: Run unit tests
+    - name: Run async unit tests
       run: cargo test --release --verbose -- --nocapture
+    - name: Run sync unit tests
+      run: cargo test --release --verbose --all-features -- --nocapture

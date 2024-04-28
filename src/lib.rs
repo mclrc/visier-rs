@@ -1,22 +1,30 @@
+use maybe_async::maybe_async;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
 use std::error::Error;
+
+#[cfg(not(feature = "is_sync"))]
+use reqwest::Client as HttpClient;
+
+#[cfg(feature = "is_sync")]
+use reqwest::blocking::Client as HttpClient;
 
 const DEFAULT_VIZIER_TAP_URL: &str = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync";
 
 pub struct Client {
     tap_url: String,
-    http_client: reqwest::Client,
+    http_client: HttpClient,
 }
 
 impl Client {
     pub fn new(tap_url: &str) -> Self {
         Self {
             tap_url: tap_url.to_string(),
-            http_client: reqwest::Client::new(),
+            http_client: HttpClient::new(),
         }
     }
 
+    #[maybe_async]
     pub async fn query<T: DeserializeOwned>(
         &self,
         adql_query: &str,
@@ -32,8 +40,13 @@ impl Client {
             .http_client
             .get(&self.tap_url)
             .query(&request_query)
-            .send()
-            .await?;
+            .send();
+
+        #[cfg(not(feature = "is_sync"))]
+        let response = response.await?;
+
+        #[cfg(feature = "is_sync")]
+        let response = response?;
 
         if response.status().is_success() {
             let data = response.json::<Value>().await?;
@@ -92,6 +105,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg(not(feature = "is_sync"))]
     #[tokio::test]
     async fn query_test() {
         let client = Client::default();
@@ -125,6 +139,7 @@ mod tests {
         recno: i32,
     }
 
+    #[cfg(not(feature = "is_sync"))]
     #[tokio::test]
     async fn query_test_typed() {
         let client = Client::default();
@@ -133,5 +148,16 @@ mod tests {
             .query::<QueryResult>("SELECT TOP 100 * FROM \"I/261/fonac\"")
             .await
             .unwrap();
+    }
+
+    #[cfg(feature = "is_sync")]
+    #[test]
+    fn query_test_sync() {
+        let client = Client::default();
+        let result = client
+            .query::<Value>("SELECT TOP 100 * FROM \"I/261/fonac\"")
+            .unwrap();
+
+        assert!(result.len() == 100);
     }
 }
