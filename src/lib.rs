@@ -9,6 +9,20 @@ use reqwest::Client as HttpClient;
 #[cfg(feature = "is_sync")]
 use reqwest::blocking::Client as HttpClient;
 
+#[cfg(not(feature = "is_sync"))]
+macro_rules! maybe_await {
+    ($future:expr) => {
+        $future.await
+    };
+}
+
+#[cfg(feature = "is_sync")]
+macro_rules! maybe_await {
+    ($value:expr) => {
+        $value
+    };
+}
+
 const DEFAULT_VIZIER_TAP_URL: &str = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync";
 
 pub struct Client {
@@ -36,20 +50,14 @@ impl Client {
             "query": adql_query
         });
 
-        let response = self
+        let response = maybe_await!(self
             .http_client
             .get(&self.tap_url)
             .query(&request_query)
-            .send();
-
-        #[cfg(not(feature = "is_sync"))]
-        let response = response.await?;
-
-        #[cfg(feature = "is_sync")]
-        let response = response?;
+            .send())?;
 
         if response.status().is_success() {
-            let data = response.json::<Value>().await?;
+            let data = maybe_await!(response.json::<Value>())?;
             let parsed_data = Client::parse_query_result::<T>(data)?;
             Ok(parsed_data)
         } else {
